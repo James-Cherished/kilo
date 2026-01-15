@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react"
 import { Box, Text } from "ink"
 import { useAtomValue, useSetAtom } from "jotai"
 import { isStreamingAtom, errorAtom, addMessageAtom, messageResetCounterAtom, yoloModeAtom } from "../state/atoms/ui.js"
+import { processImagePaths } from "../media/images.js"
 import { setCIModeAtom } from "../state/atoms/ci.js"
 import { configValidationAtom } from "../state/atoms/config.js"
 import { taskResumedViaContinueOrSessionAtom } from "../state/atoms/extension.js"
@@ -37,6 +38,7 @@ import { notificationsAtom } from "../state/atoms/notifications.js"
 import { workspacePathAtom } from "../state/atoms/shell.js"
 import { useTerminal } from "../state/hooks/useTerminal.js"
 import { exitRequestCounterAtom } from "../state/atoms/keyboard.js"
+import { useWebviewMessage } from "../state/hooks/useWebviewMessage.js"
 
 // Initialize commands on module load
 initializeCommands()
@@ -73,6 +75,9 @@ export const UI: React.FC<UIAppProps> = ({ options, onExit }) => {
 	const { sendUserMessage, isSending: isSendingMessage } = useMessageHandler({
 		...(options.ci !== undefined && { ciMode: options.ci }),
 	})
+
+	// Get sendMessage for sending initial prompt with attachments
+	const { sendMessage } = useWebviewMessage()
 
 	// Followup handler hook for automatic suggestion population
 	useFollowupHandler()
@@ -176,17 +181,56 @@ export const UI: React.FC<UIAppProps> = ({ options, onExit }) => {
 				if (isCommandInput(trimmedPrompt)) {
 					executeCommand(trimmedPrompt, onExit)
 				} else {
-					sendUserMessage(trimmedPrompt)
+					// Check if there are CLI attachments to load
+					if (options.attachments && options.attachments.length > 0) {
+						// Async IIFE to load attachments and send message
+						;(async () => {
+							logs.debug("Loading CLI attachments", "UI", { count: options.attachments!.length })
+							const result = await processImagePaths(options.attachments!)
+
+							// Check for any errors - if any attachment fails, abort the task
+							if (result.errors.length > 0) {
+								const errorMsg = result.errors
+									.map((e) => `Failed to load attachment "${e.path}": ${e.error}`)
+									.join("\n")
+								logs.error("Attachment loading failed, aborting task", "UI", { error: errorMsg })
+								const now = Date.now()
+								addMessage({
+									id: `attach-err-${now}-${Math.random()}`,
+									type: "error",
+									content: errorMsg,
+									ts: now,
+								})
+								// Exit in CI mode since we cannot proceed
+								if (options.ci) {
+									setTimeout(() => onExit(), 500)
+								}
+								return
+							}
+
+							logs.debug("Sending prompt with attachments", "UI", {
+								textLength: trimmedPrompt.length,
+								imageCount: result.images.length,
+							})
+							// Send message with loaded images directly using sendMessage
+							await sendMessage({ type: "newTask", text: trimmedPrompt, images: result.images })
+						})()
+					} else {
+						sendUserMessage(trimmedPrompt)
+					}
 				}
 			}
 		}
 	}, [
 		options.prompt,
+		options.attachments,
 		taskResumedViaSession,
 		hasActiveTask,
 		configValidation.valid,
 		executeCommand,
 		sendUserMessage,
+		sendMessage,
+		addMessage,
 		onExit,
 	])
 
@@ -251,27 +295,18 @@ export const UI: React.FC<UIAppProps> = ({ options, onExit }) => {
 	])
 
 	useEffect(() => {
-		if (!options.noSplash) {
-			return
-		}
-
 		const checkVersion = async () => {
 			setVersionStatus(await getAutoUpdateStatus())
 		}
 
-		if (!autoUpdatedCheckedRef.current && !options.ci) {
+		if (!autoUpdatedCheckedRef.current && !options.ci && process.env.KILO_EPHEMERAL_MODE !== "true") {
 			autoUpdatedCheckedRef.current = true
 			checkVersion()
 		}
-	}, [])
+	}, [options.ci])
 
 	// Show update or notification messages
 	useEffect(() => {
-		// Skip if noSplash option is enabled
-		if (options.noSplash) {
-			return
-		}
-
 		if (!versionStatus) return
 
 		if (versionStatus.isOutdated) {
@@ -280,7 +315,7 @@ export const UI: React.FC<UIAppProps> = ({ options, onExit }) => {
 			// Only show notification if there's no pending update
 			addMessage(generateNotificationMessage(notifications[0]))
 		}
-	}, [notifications, versionStatus, options.noSplash])
+	}, [notifications, versionStatus, addMessage])
 
 	// Fetch task history on mount if not in CI mode
 	const taskHistoryFetchedRef = useRef(false)
