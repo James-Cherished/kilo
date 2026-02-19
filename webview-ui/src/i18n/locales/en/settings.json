@@ -1065,7 +1065,7 @@
 		},
 		"AUTO_EXECUTE_WORKFLOW": {
 			"name": "Enable Kilo workflow access",
-			"description": "When enabled, Kilo Code can access and execute workflow slash commands to retrieve their content without requiring approval."
+			"description": "When enabled, Kilo Code can execute workflow slash commands to retrieve their content without requiring approval."
 		},
 		"MULTIPLE_NATIVE_TOOL_CALLS": {
 			"name": "Parallel tool calls",
