@@ -78,19 +78,18 @@ export const ExperimentalSettings = ({
 					// Hide MULTIPLE_NATIVE_TOOL_CALLS - feature is on hold
 					.filter(([key]) => key !== "MULTIPLE_NATIVE_TOOL_CALLS")
 					.map((config) => {
-						// Use the same translation key pattern as ExperimentalFeature
 						const experimentKey = config[0]
-						const label = t(`settings:experimental.${experimentKey}.name`)
-
-						if (config[0] === "MULTI_FILE_APPLY_DIFF") {
+						const label = t(`settings:experimental.${experimentKey.toLowerCase()}.name`)
+						// kilocode_change start: Special handling for experiments with custom components
+						if (experimentKey === "MULTI_FILE_APPLY_DIFF") {
 							return (
 								<SearchableSetting
-									key={config[0]}
-									settingId={`experimental-${config[0].toLowerCase()}`}
+									key={experimentKey}
+									settingId={`experimental-${experimentKey.toLowerCase()}`}
 									section="experimental"
 									label={label}>
 									<ExperimentalFeature
-										experimentKey={config[0]}
+										experimentKey={experimentKey}
 										enabled={experiments[EXPERIMENT_IDS.MULTI_FILE_APPLY_DIFF] ?? false}
 										onChange={(enabled) =>
 											setExperimentEnabled(EXPERIMENT_IDS.MULTI_FILE_APPLY_DIFF, enabled)
@@ -99,19 +98,17 @@ export const ExperimentalSettings = ({
 								</SearchableSetting>
 							)
 						}
-						// kilocode_change start
-						if (config[0] === "MORPH_FAST_APPLY") {
+						if (experimentKey === "MORPH_FAST_APPLY") {
 							const enabled =
-								experiments[EXPERIMENT_IDS[config[0] as keyof typeof EXPERIMENT_IDS]] ?? false
+								experiments[EXPERIMENT_IDS[experimentKey as keyof typeof EXPERIMENT_IDS]] ?? false
 							return (
-								<React.Fragment key={config[0]}>
+								<React.Fragment key={experimentKey}>
 									<ExperimentalFeature
-										key={config[0]}
-										experimentKey={config[0]}
+										experimentKey={experimentKey}
 										enabled={enabled}
 										onChange={(enabled) =>
 											setExperimentEnabled(
-												EXPERIMENT_IDS[config[0] as keyof typeof EXPERIMENT_IDS],
+												EXPERIMENT_IDS[experimentKey as keyof typeof EXPERIMENT_IDS],
 												enabled,
 											)
 										}
@@ -128,13 +125,12 @@ export const ExperimentalSettings = ({
 							)
 						}
 						// kilocode_change end
-						if (config[0] === "SPEECH_TO_TEXT") {
+						if (experimentKey === "SPEECH_TO_TEXT") {
 							const enabled = experiments[EXPERIMENT_IDS.SPEECH_TO_TEXT] ?? false
 							return (
-								<React.Fragment key={config[0]}>
+								<React.Fragment key={experimentKey}>
 									<ExperimentalFeature
-										key={config[0]}
-										experimentKey={config[0]}
+										experimentKey={experimentKey}
 										enabled={enabled}
 										onChange={(enabled) =>
 											setExperimentEnabled(EXPERIMENT_IDS.SPEECH_TO_TEXT, enabled)
@@ -145,7 +141,7 @@ export const ExperimentalSettings = ({
 							)
 						}
 						if (
-							config[0] === "IMAGE_GENERATION" &&
+							experimentKey === "IMAGE_GENERATION" &&
 							setImageGenerationProvider &&
 							setOpenRouterImageApiKey &&
 							setKiloCodeImageApiKey &&
@@ -153,8 +149,8 @@ export const ExperimentalSettings = ({
 						) {
 							return (
 								<SearchableSetting
-									key={config[0]}
-									settingId={`experimental-${config[0].toLowerCase()}`}
+									key={experimentKey}
+									settingId={`experimental-${experimentKey.toLowerCase()}`}
 									section="experimental"
 									label={label}>
 									<ImageGenerationSettings
@@ -175,11 +171,11 @@ export const ExperimentalSettings = ({
 								</SearchableSetting>
 							)
 						}
-						if (config[0] === "CUSTOM_TOOLS") {
+						if (experimentKey === "CUSTOM_TOOLS") {
 							return (
 								<SearchableSetting
-									key={config[0]}
-									settingId={`experimental-${config[0].toLowerCase()}`}
+									key={experimentKey}
+									settingId={`experimental-${experimentKey.toLowerCase()}`}
 									section="experimental"
 									label={label}>
 									<CustomToolsSettings
@@ -191,20 +187,32 @@ export const ExperimentalSettings = ({
 								</SearchableSetting>
 							)
 						}
+						// kilocode_change start: Skip experiments that have special handling above
+						// to prevent duplicates in the UI when conditions aren't met
+						if (
+							experimentKey === "MULTI_FILE_APPLY_DIFF" ||
+							experimentKey === "MORPH_FAST_APPLY" ||
+							experimentKey === "IMAGE_GENERATION" ||
+							experimentKey === "SPEECH_TO_TEXT" ||
+							experimentKey === "CUSTOM_TOOLS"
+						) {
+							return null
+						}
+						// kilocode_change end
 						return (
 							<SearchableSetting
-								key={config[0]}
-								settingId={`experimental-${config[0].toLowerCase()}`}
+								key={experimentKey}
+								settingId={`experimental-${experimentKey.toLowerCase()}`}
 								section="experimental"
 								label={label}>
 								<ExperimentalFeature
-									experimentKey={config[0]}
+									experimentKey={experimentKey}
 									enabled={
-										experiments[EXPERIMENT_IDS[config[0] as keyof typeof EXPERIMENT_IDS]] ?? false
+										experiments[EXPERIMENT_IDS[experimentKey as keyof typeof EXPERIMENT_IDS]] ?? false
 									}
 									onChange={(enabled) =>
 										setExperimentEnabled(
-											EXPERIMENT_IDS[config[0] as keyof typeof EXPERIMENT_IDS],
+											EXPERIMENT_IDS[experimentKey as keyof typeof EXPERIMENT_IDS],
 											enabled,
 										)
 									}
